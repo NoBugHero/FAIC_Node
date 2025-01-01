@@ -3,6 +3,9 @@ use bip39::{Mnemonic, Language};
 use tiny_keccak::{Keccak, Hasher};
 use hex;
 use rand::{RngCore, rngs::OsRng};
+use std::sync::RwLock;
+use std::collections::HashMap;
+use lazy_static::lazy_static;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
@@ -10,7 +13,12 @@ pub struct Account {
     pub balance: f64,
 }
 
-pub fn create_wallet(password_hash: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
+// 全局账户余额存储
+lazy_static! {
+    static ref ACCOUNT_BALANCES: RwLock<HashMap<String, f64>> = RwLock::new(HashMap::new());
+}
+
+pub fn create_wallet(_password_hash: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
     // 1. 生成随机熵值
     let mut entropy = [0u8; 16];
     OsRng.fill_bytes(&mut entropy);
@@ -37,6 +45,10 @@ pub fn create_wallet(password_hash: &str) -> Result<(String, String), Box<dyn st
     let address_base = hex::encode(&hash[..20]);
     let address = format!("FAIC{}", address_base);
     
+    // 为新钱包分配初始余额
+    let mut balances = ACCOUNT_BALANCES.write().unwrap();
+    balances.insert(address.clone(), 1000.0);
+
     Ok((
         address,
         mnemonic.to_string()
@@ -66,4 +78,33 @@ pub fn import_wallet_from_mnemonic(mnemonic: &str) -> Result<String, Box<dyn std
     let address = format!("FAIC{}", address_base);
     
     Ok(address)
+}
+
+// 添加获取余额的函数
+pub fn get_balance(address: &str) -> f64 {
+    let balances = ACCOUNT_BALANCES.read().unwrap();
+    *balances.get(address).unwrap_or(&0.0)
+}
+
+// 添加转账函数
+pub async fn transfer(from: &str, to: &str, amount: f64) -> Result<String, Box<dyn std::error::Error>> {
+    let mut balances = ACCOUNT_BALANCES.write().unwrap();
+    
+    // 检查发送方余额
+    let sender_balance = balances.get(from).unwrap_or(&0.0);
+    if *sender_balance < amount {
+        return Err("Insufficient balance".into());
+    }
+    
+    // 执行转账
+    *balances.get_mut(from).unwrap() -= amount;
+    *balances.entry(to.to_string()).or_insert(0.0) += amount;
+    
+    // 生成交易哈希
+    let mut hasher = Keccak::v256();
+    hasher.update(format!("{}{}{}", from, to, amount).as_bytes());
+    let mut hash = [0u8; 32];
+    hasher.finalize(&mut hash);
+    
+    Ok(hex::encode(hash))
 }
