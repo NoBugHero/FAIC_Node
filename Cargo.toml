@@ -1,0 +1,21 @@
+[package]
+name = "FAIC_Node"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+actix-web = "4.0"
+actix-cors = "0.7.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.11.6"
+async-trait = "0.1"
+ring = "0.17.8"
+hex = "0.4"
+chrono = "0.4"
+web3 = "0.19.0"
+bip39 = "2.1.0"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+rand = "0.8"
